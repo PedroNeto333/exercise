@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catálogo de Livros - Supabase</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .formulario {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: Arial, sans-serif;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #4CAF50;
+      box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    button:active {
+      background-color: #3d8b40;
+    }
+
+    #lista {
+      list-style: none;
+    }
+
+    #lista li {
+      background-color: white;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      border-left: 4px solid #4CAF50;
+    }
+
+    #lista li:hover {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .erro {
+      background-color: #f8d7da;
+      color: #721c24;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      border: 1px solid #f5c6cb;
+    }
+
+    .sucesso {
+      background-color: #d4edda;
+      color: #155724;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      border: 1px solid #c3e6cb;
+    }
+
+    .carregando {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <h1>Catálogo de Livros</h1>
+
+  <div id="mensagem"></div>
+
+  <div class="formulario">
+    <input id="titulo" placeholder="Título do livro" type="text">
+    <input id="autor" placeholder="Autor" type="text">
+    <button id="add">Adicionar Livro</button>
+  </div>
+
+  <div id="carregando" class="carregando" style="display: none;">Carregando...</div>
+  <ul id="lista"></ul>
+
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "SUA_URL_AQUI";
+    const SUPABASE_ANON_KEY = "SUA_CHAVE_ANON_AQUI";
+
+    let supabase = null;
+
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (erro) {
+      exibirMensagem('Erro ao conectar com Supabase. Verifique suas credenciais.', 'erro');
+    }
+
+    function exibirMensagem(texto, tipo = 'info') {
+      const msgDiv = document.getElementById('mensagem');
+      msgDiv.textContent = texto;
+      msgDiv.className = tipo;
+      if (tipo !== 'info') {
+        setTimeout(() => {
+          msgDiv.textContent = '';
+          msgDiv.className = '';
+        }, 3000);
+      }
+    }
+
+    function mostrarCarregando(mostrar) {
+      document.getElementById('carregando').style.display = mostrar ? 'block' : 'none';
+    }
+
+    async function carregar() {
+      if (!supabase) return;
+
+      try {
+        mostrarCarregando(true);
+        const { data, error } = await supabase
+          .from('livros')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          throw error;
+        }
+
+        const lista = document.getElementById('lista');
+        if (data.length === 0) {
+          lista.innerHTML = '<li style="background-color: #f0f0f0; border-left: none; text-align: center; color: #999;">Nenhum livro cadastrado</li>';
+        } else {
+          lista.innerHTML = data
+            .map(l => `<li><strong>${l.titulo}</strong> — ${l.autor}</li>`)
+            .join('');
+        }
+      } catch (erro) {
+        console.error('Erro ao carregar livros:', erro);
+        exibirMensagem('Erro ao carregar livros: ' + erro.message, 'erro');
+      } finally {
+        mostrarCarregando(false);
+      }
+    }
+
+    async function adicionar() {
+      if (!supabase) {
+        exibirMensagem('Conexão com Supabase não foi estabelecida', 'erro');
+        return;
+      }
+
+      const titulo = document.getElementById('titulo').value.trim();
+      const autor = document.getElementById('autor').value.trim();
+
+      if (!titulo || !autor) {
+        exibirMensagem('Preencha título e autor', 'erro');
+        return;
+      }
+
+      try {
+        const { error } = await supabase.from('livros').insert({ titulo, autor });
+
+        if (error) {
+          throw error;
+        }
+
+        document.getElementById('titulo').value = '';
+        document.getElementById('autor').value = '';
+
+        exibirMensagem('Livro adicionado com sucesso!', 'sucesso');
+        carregar();
+      } catch (erro) {
+        console.error('Erro ao adicionar livro:', erro);
+        exibirMensagem('Erro ao adicionar livro: ' + erro.message, 'erro');
+      }
+    }
+
+    document.getElementById('add').onclick = adicionar;
+    document.getElementById('titulo').onkeypress = (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('autor').focus();
+      }
+    };
+    document.getElementById('autor').onkeypress = (e) => {
+      if (e.key === 'Enter') {
+        adicionar();
+      }
+    };
+
+    carregar();
+  </script>
+</body>
+</html>
